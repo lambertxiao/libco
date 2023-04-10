@@ -457,7 +457,7 @@ static int CoRoutineFunc( stCoRoutine_t *co,void * )
 }
 
 
-
+// 创建协程运行所需要的环境（协程控制块，栈内存）
 struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAttr_t* attr,
 		pfn_co_routine_t pfn,void *arg )
 {
@@ -491,6 +491,7 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 	lp->pfn = pfn;
 	lp->arg = arg;
 
+  // 如果是共享栈的模式，则从共享栈里取的一块内存
 	stStackMem_t* stack_mem = NULL;
 	if( at.share_stack )
 	{
@@ -499,6 +500,7 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 	}
 	else
 	{
+    // 否则在堆上开辟一块内存
 		stack_mem = co_alloc_stackmem(at.stack_size);
 	}
 	lp->stack_mem = stack_mem;
@@ -520,6 +522,7 @@ struct stCoRoutine_t *co_create_env( stCoRoutineEnv_t * env, const stCoRoutineAt
 
 int co_create( stCoRoutine_t **ppco,const stCoRoutineAttr_t *attr,pfn_co_routine_t pfn,void *arg )
 {
+  // 一个线程一个env
 	if( !co_get_curr_thread_env() ) 
 	{
 		co_init_curr_thread_env();
@@ -737,6 +740,7 @@ static short EpollEvent2Poll( uint32_t events )
 	return e;
 }
 
+// 定义了一个线程级别的变量
 static __thread stCoRoutineEnv_t* gCoEnvPerThread = NULL;
 
 void co_init_curr_thread_env()

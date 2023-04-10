@@ -53,8 +53,11 @@ available.
 // | regs[6]: ebp |
 // | regs[7]: eax |  = esp
 enum {
+  // 用于存储下一条指令的地址
   kEIP = 0,
+  // EBP寄存器用于存储函数堆栈帧的基地址
   kEBP = 6,
+  // ESP寄存器用于存储当前栈指针，即栈顶地址
   kESP = 7,
 };
 
@@ -75,9 +78,13 @@ enum {
 //    | regs[12]: rbx |
 // hig | regs[13]: rsp |
 enum {
+  // RDI寄存器用于存储函数的第一个参数
   kRDI = 7,
+  // RSI寄存器用于存储函数的第二个参数
   kRSI = 8,
+  // RET寄存器用于存储函数的返回地址
   kRETAddr = 9,
+  // RSP寄存器用于存储当前栈指针，即栈顶地址
   kRSP = 13,
 };
 
@@ -90,6 +97,15 @@ int coctx_init(coctx_t* ctx) {
   memset(ctx, 0, sizeof(*ctx));
   return 0;
 }
+
+// 计算协程上下文中coctx_param结构体的存储位置：首先将当前栈指针sp指向协程栈顶，
+// 然后减小coctx_param结构体的大小，使得可以在该位置存储协程参数。
+// 计算协程切换后调用函数的返回地址：为了在协程切换后，恢复执行并继续执行协程中的函数，需要保存该函数的返回地址。
+// 这里使用了一个trick：将协程参数的位置往后移动sizeof(void*)*2字节，然后在该位置的下一个void指针处存储函数地址。
+// 设置协程参数：将参数值s、s1分别存储到coctx_param结构体的成员变量s1、s2中。
+// 清空协程寄存器：使用memset()函数将协程寄存器数组regs中的值全部初始化为0。
+// 设置协程栈指针：将协程栈指针regs[kESP]设置为当前栈指针sp减去2个void指针的大小，这样协程切换时可以正确恢复栈指针。
+// 返回0：表示创建协程上下文成功。
 int coctx_make(coctx_t* ctx, coctx_pfn_t pfn, const void* s, const void* s1) {
   // make room for coctx_param
   char* sp = ctx->ss_sp + ctx->ss_size - sizeof(coctx_param_t);
