@@ -89,7 +89,13 @@ enum {
 };
 
 // 64 bit
+// 用C的
 extern "C" {
+// 这是一个函数声明，使用了asm指令将函数名coctx_swap映射到汇编代码的符号coctx_swap中。
+// 该函数接受两个coctx_t类型的指针参数，并在这两个上下文之间进行切换，以实现协程的切换。
+// 具体来说，该函数将当前的上下文保存在第一个参数中，然后将第二个参数中的上下文恢复，并开始执行第二个上下文中指定的代码。
+// 该函数通常用于实现协程调度器中的协程切换功能。
+// asm是GCC和部分其他编译器提供的一个关键字，用于在C/C++代码中嵌入汇编代码。
 extern void coctx_swap(coctx_t*, coctx_t*) asm("coctx_swap");
 };
 #if defined(__i386__)
@@ -131,11 +137,16 @@ int coctx_make(coctx_t* ctx, coctx_pfn_t pfn, const void* s, const void* s1) {
   void** ret_addr = (void**)(sp);
   *ret_addr = (void*)pfn;
 
+  // 记住栈顶位置
   ctx->regs[kRSP] = sp;
 
+  // 记住返回地址
   ctx->regs[kRETAddr] = (char*)pfn;
 
+  // 记住第一个参数 
   ctx->regs[kRDI] = (char*)s;
+  
+  // 记住第二个参数
   ctx->regs[kRSI] = (char*)s1;
   return 0;
 }

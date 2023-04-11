@@ -49,15 +49,22 @@
 
 typedef long long ll64_t;
 
+// 用于拦截和修改网络应用程序中的RPC请求和响应
 struct rpchook_t
 {
+  // 可以决定是阻塞的还是非阻塞的
 	int user_flag;
+  // 指定钩子拦截请求的目标服务器的网络地址
 	struct sockaddr_in dest; //maybe sockaddr_un;
 	int domain; //AF_LOCAL , AF_INET
 
+  // 指定从套接字读取数据时等待服务器响应的最长时间
 	struct timeval read_timeout;
+  // 指定从套接字写入数据时等待服务器响应的最长时间
 	struct timeval write_timeout;
 };
+
+// 获取进程id
 static inline pid_t GetPid()
 {
 	char **p = (char**)pthread_self();
@@ -65,6 +72,7 @@ static inline pid_t GetPid()
 }
 static rpchook_t *g_rpchook_socket_fd[ 102400 ] = { 0 };
 
+// 定义了一堆的函数指针
 typedef int (*socket_pfn_t)(int domain, int type, int protocol);
 typedef int (*connect_pfn_t)(int socket, const struct sockaddr *address, socklen_t address_len);
 typedef int (*close_pfn_t)(int fd);
@@ -101,6 +109,17 @@ typedef res_state (*__res_state_pfn_t)();
 typedef int (*__poll_pfn_t)(struct pollfd fds[], nfds_t nfds, int timeout);
 typedef int (*gethostbyname_r_pfn_t)(const char* __restrict name, struct hostent* __restrict __result_buf, char* __restrict __buf, size_t __buflen, struct hostent** __restrict __result, int* __restrict __h_errnop);
 
+// dlsym函数是一个C语言的动态链接库函数，用于在运行时动态地获取一个共享库（或DLL）中的函数或变量地址
+// 其中，handle是一个指向已打开共享库的指针，symbol是一个字符串，表示要获取的函数或变量的名称。
+// dlsym函数会在共享库中查找该名称对应的函数或变量，并返回其地址（void*类型）。
+// 如果在共享库中找不到对应的符号，则返回NULL。
+// dlsym函数可以用于在运行时动态地加载和使用共享库中的函数或变量，这对于实现插件化架构、动态扩展功能等都非常有用。
+
+// 当我们在程序中需要使用一个系统函数，但又想要在函数调用前或调用后做一些额外的处理，
+// 例如打印日志、修改参数等，就可以使用RTLD_NEXT来实现。RTLD_NEXT允许我们在运行时动态地拦截系统函数的调用，
+// 将其重定向到我们自定义的函数中，从而实现对系统函数的增强或修改。
+//
+// 下面的逻辑将所有同步的系统调用如connect、send等函数的地址先保存了下来
 static socket_pfn_t g_sys_socket_func 	= (socket_pfn_t)dlsym(RTLD_NEXT,"socket");
 static connect_pfn_t g_sys_connect_func = (connect_pfn_t)dlsym(RTLD_NEXT,"connect");
 static close_pfn_t g_sys_close_func 	= (close_pfn_t)dlsym(RTLD_NEXT,"close");
@@ -170,7 +189,7 @@ struct rpchook_connagent_head_t
 	unsigned char    sReserved[6];
 }__attribute__((packed));
 
-
+// 接受一个函数名，将该函数替换掉，如传入connect函数名，则将g_sys_connect_func
 #define HOOK_SYS_FUNC(name) if( !g_sys_##name##_func ) { g_sys_##name##_func = (name##_pfn_t)dlsym(RTLD_NEXT,#name); }
 
 static inline ll64_t diff_ms(struct timeval &begin,struct timeval &end)

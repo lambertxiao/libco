@@ -45,11 +45,18 @@ typedef void *(*pfn_co_routine_t)( void * );
 
 //2.co_routine
 
+// 创建一个协程
 int 	co_create( stCoRoutine_t **co,const stCoRoutineAttr_t *attr,void *(*routine)(void*),void *arg );
+// 启动一个协程
 void    co_resume( stCoRoutine_t *co );
+// 将传入的协程退出cpu 
 void    co_yield( stCoRoutine_t *co );
+
+// 将当前正在执行的协程让出CPU，让其他协程执行。它不需要传入协程结构体的指针，而是直接从当前协程环境中获取当前正在执行的协程
 void    co_yield_ct(); //ct = current thread
+// 释放资源
 void    co_release( stCoRoutine_t *co );
+// 重置状态
 void    co_reset(stCoRoutine_t * co); 
 
 stCoRoutine_t *co_self();
@@ -68,11 +75,13 @@ stCoEpoll_t * 	co_get_epoll_ct(); //ct = current thread
 
 //5.hook syscall ( poll/read/write/recv/send/recvfrom/sendto )
 
+// 是否为系统调用加上钩子
 void 	co_enable_hook_sys();  
 void 	co_disable_hook_sys();  
 bool 	co_is_enable_sys_hook();
 
 //6.sync
+// 协程同步相关结构
 struct stCoCond_t;
 
 stCoCond_t *co_cond_alloc();
