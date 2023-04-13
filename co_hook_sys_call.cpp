@@ -596,6 +596,7 @@ ssize_t recv( int socket, void *buffer, size_t length, int flags )
 
 extern int co_poll_inner( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeout, poll_pfn_t pollfunc);
 
+// 在给定的超时时间内，轮训fds
 int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 {
 	HOOK_SYS_FUNC( poll );
@@ -607,7 +608,9 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 	nfds_t nfds_merge = 0;
 	std::map<int, int> m;  // fd --> idx
 	std::map<int, int>::iterator it;
-	if (nfds > 1) {
+	
+  // 合并重复的fd
+  if (nfds > 1) {
 		fds_merge = (pollfd *)malloc(sizeof(pollfd) * nfds);
 		for (size_t i = 0; i < nfds; i++) {
 			if ((it = m.find(fds[i].fd)) == m.end()) {
@@ -639,8 +642,6 @@ int poll(struct pollfd fds[], nfds_t nfds, int timeout)
 	}
 	free(fds_merge);
 	return ret;
-
-
 }
 int setsockopt(int fd, int level, int option_name,
 			                 const void *option_value, socklen_t option_len)

@@ -43,7 +43,8 @@ void* Producer(void* args)
 		env->task_queue.push(task);
 		printf("%s:%d produce task %d\n", __func__, __LINE__, task->id);
 		co_cond_signal(env->cond);
-		poll(NULL, 0, 1000);
+		// poll此时已经被co_enable_hook_sys hook掉了
+    poll(NULL, 0, 1000);
 	}
 	return NULL;
 }
@@ -55,6 +56,7 @@ void* Consumer(void* args)
 	{
 		if (env->task_queue.empty())
 		{
+      // 阻塞住，等待唤醒
 			co_cond_timedwait(env->cond, -1);
 			continue;
 		}
