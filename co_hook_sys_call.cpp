@@ -360,20 +360,27 @@ ssize_t read( int fd, void *buf, size_t nbyte )
 	}
 	rpchook_t *lp = get_by_fd( fd );
 
+  // 如果没有找到这个fd或者fd设置了非阻塞，如果上层已经设置了非阻塞了，则这里什么都不用做
 	if( !lp || ( O_NONBLOCK & lp->user_flag ) ) 
 	{
 		ssize_t ret = g_sys_read_func( fd,buf,nbyte );
 		return ret;
 	}
+
+  // 如果上层没设置fd是非阻塞的，由于我们不能让协程等待，所以下面需要让出cpu
 	int timeout = ( lp->read_timeout.tv_sec * 1000 ) 
 				+ ( lp->read_timeout.tv_usec / 1000 );
 
 	struct pollfd pf = { 0 };
 	pf.fd = fd;
+
+  // 读事件，错误事件，断开事件
 	pf.events = ( POLLIN | POLLERR | POLLHUP );
 
+  // 这里会告诉epoll，在有这个fd的事件的时候回调我们，底下会设置好epoll状态后，就交出cpu
 	int pollret = poll( &pf,1,timeout );
 
+  // 到了这里，重新拿到了cpu的执行权, 此时fd已经可读了，将数据读出
 	ssize_t readret = g_sys_read_func( fd,(char*)buf ,nbyte );
 
 	if( readret < 0 )
@@ -404,6 +411,7 @@ ssize_t write( int fd, const void *buf, size_t nbyte )
 	int timeout = ( lp->write_timeout.tv_sec * 1000 ) 
 				+ ( lp->write_timeout.tv_usec / 1000 );
 
+  // 尝试直接写，写不了就告诉epoll能写了再通知我
 	ssize_t writeret = g_sys_write_func( fd,(const char*)buf + wrotelen,nbyte - wrotelen );
 
 	if (writeret == 0)
@@ -415,12 +423,14 @@ ssize_t write( int fd, const void *buf, size_t nbyte )
 	{
 		wrotelen += writeret;	
 	}
+  // 循环，直到数据全部写完
 	while( wrotelen < nbyte )
 	{
 
 		struct pollfd pf = { 0 };
 		pf.fd = fd;
-		pf.events = ( POLLOUT | POLLERR | POLLHUP );
+		// 关注可写事件，错误事件，断开事件
+    pf.events = ( POLLOUT | POLLERR | POLLHUP );
 		poll( &pf,1,timeout );
 
 		writeret = g_sys_write_func( fd,(const char*)buf + wrotelen,nbyte - wrotelen );
@@ -461,6 +471,7 @@ ssize_t sendto(int socket, const void *message, size_t length,
 		return g_sys_sendto_func( socket,message,length,flags,dest_addr,dest_len );
 	}
 
+  // 尝试发一次，发不出去就跟epoll说能发了再找我
 	ssize_t ret = g_sys_sendto_func( socket,message,length,flags,dest_addr,dest_len );
 	if( ret < 0 && EAGAIN == errno )
 	{
@@ -504,6 +515,7 @@ ssize_t recvfrom(int socket, void *buffer, size_t length,
 	pf.events = ( POLLIN | POLLERR | POLLHUP );
 	poll( &pf,1,timeout );
 
+  // recvfrom的语意就是收到多少往上返回多少，因此不用循环recvfrom
 	ssize_t ret = g_sys_recvfrom_func( socket,buffer,length,flags,address,address_len );
 	return ret;
 }
